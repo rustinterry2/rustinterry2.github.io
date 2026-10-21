@@ -1,9 +1,10 @@
 # Rustin Terry's projects
 
-A very simple, mobile-friendly landing page for two browser games and their source code:
+A simple, mobile-friendly landing page for games, software projects, and a public election forecasting workbook:
 
 - [Infinite-Dimensional Tic-Tac-Toe](https://rustinterry2.github.io/infinite-tic-tac-toe/)
 - [Connections Solver](https://rustinterry2.github.io/connections-solver/)
+- [U.S. Senate Election Forecast](https://docs.google.com/spreadsheets/d/1vwDXpB_LDSCXGWVQ8GQNT6Gw_QHNPdMFBOr0IzhU4JY/edit)
 
 The homepage itself uses one static `index.html` with inline CSS and no JavaScript, external libraries, build steps, or tracking.
 
