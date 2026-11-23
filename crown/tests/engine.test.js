@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {CrownState,SAXONS,NORMANS,IDS,TIERS,START_RANK,LEAD,SUMMARY} from '../engine.js';
+import {CrownState,SAXONS,NORMANS,IDS,TIERS,START_RANK,LEAD,SUMMARY,MAIDEN_MIN_TURN} from '../engine.js';
 test('all Saxon lords retain their numerical leadership and labels',()=>{for(let l of SAXONS){let s=new CrownState({humanChoice:l,seed:24680});assert.equal(s.rank(l),START_RANK[l]);assert.equal(s.leadershipValue(l),LEAD[l]);}});
 test('accepting invitation moves a single display tier, numeric bonus independent',()=>{let s=new CrownState({seed:16,humanChoice:'Wolfric the Wild'});s.changeRank(s.human,1);s.changeLeadership(s.human,.04);assert.equal(s.rank(s.human),'Fair');assert.ok(Math.abs(s.leadershipValue(s.human)-.84)<1e-8);s.changeRank(s.human,-1);s.changeLeadership(s.human,-.04);assert.equal(s.rank(s.human),'Average');assert.ok(Math.abs(s.leadershipValue(s.human)-.80)<1e-8);});
 test('treasury, home recruitment, transfer and monthly tax are conserved',()=>{let s=new CrownState({seed:42});let p=s.lords[s.human],home=p.home_province;let before=p.treasury;s.purchase(s.human,{soldiers:5});assert.equal(p.treasury,before-5);assert.equal(p.home_army.soldiers,25);s.transfer(s.human,{soldiers:15,knights:0,catapults:0});assert.equal(p.campaign_army.soldiers,15);assert.equal(p.home_army.soldiers,10);s.advanceMonth();assert.equal(p.treasury,before-5+s.income(s.human));});
@@ -29,4 +29,30 @@ test('all Norman castles captured leads to victory',()=>{
   const s=new CrownState({seed:20,humanChoice:'Cedric of Rotherwood'}),h=s.human;
   for(const id of s.norman_home_ids)s.provinces[id].owner=h;
   assert.equal(s.checkEnd(),'victory');
+});
+
+test('maiden rescue requires four completed turns and a qualifying Saxon ally',()=>{
+  assert.equal(MAIDEN_MIN_TURN,4);
+  const s=new CrownState({seed:194,humanChoice:'Cedric of Rotherwood',difficulty:'easy'});
+  assert.equal(s.maidenCandidate(),null,'never offer at campaign start');
+  let ally=Object.keys(s.lords).find(l=>l!==s.human&&s.lords[l].faction==='Saxon'&&s.lords[l].alive);
+  assert.ok(ally,'easy mode includes an allied Saxon');
+  s.turn=3;assert.equal(s.maidenCandidate(),null,'must not offer after three turns');
+  s.turn=4;
+  for(const id of IDS)if(s.provinces[id].owner===ally&&!s.provinces[id].home_castle)s.provinces[id].owner=null;
+  const home=s.lords[ally].home_province;
+  const neutral=IDS.find(id=>!s.provinces[id].owner&&!s.provinces[id].home_castle);
+  assert.ok(neutral,'requires a spare province to give the ally');
+  s.provinces[neutral].owner=ally;
+  assert.equal(s.territoryCount(ally),2);
+  assert.equal(s.maidenCandidate(),ally,'eligible after four completed turns');
+  s.maiden_rescue_done=true;assert.equal(s.maidenCandidate(),null,'cannot repeat the event');
+});
+test('tournament invitation flags are preserved when maiden is not eligible',()=>{
+  const s=new CrownState({seed:30,humanChoice:'Cedric of Rotherwood'});
+  s.tournament_pending=true;
+  assert.equal(s.maidenCandidate(),null);
+  assert.equal(s.tournament_pending,true);
+  s.tournament_pending=false;s.tournament_held=true;
+  assert.equal(s.tournament_held,true);
 });
