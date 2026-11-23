@@ -19,6 +19,7 @@ export const CASTLE_POS={1:[391,228],5:[474,384],9:[356,457],8:[680,519],14:[496
 export const EMPTY=()=>({soldiers:0,knights:0,catapults:0});
 export const COUNT=a=>U.reduce((n,u)=>n+a[u],0);
 export const SUMMARY=a=>`${a.soldiers} S / ${a.knights} K / ${a.catapults} C`;
+export const MAIDEN_MIN_TURN=4; // Four completed monthly turns, matching the Pyto maiden-rescue event.
 export const MONTH=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const clamp=(a,b,c)=>Math.max(a,Math.min(b,c));
 const pyround=x=>Math.round(x+Number.EPSILON);
@@ -56,6 +57,12 @@ export class CrownState{
   event(action,lord=null,province=null,details={}){this.ledger.push({id:this.ledger.length+1,turn:this.turn,year:this.year,month:this.month,action,lord,province,...details});}
   income(l){return IDS.filter(id=>this.provinces[id].owner===l).reduce((n,id)=>n+T[id][1],0);}
   territoryCount(l){return IDS.filter(id=>this.provinces[id].owner===l).length;}
+  maidenCandidate(){
+    if(this.turn<MAIDEN_MIN_TURN||this.maiden_rescue_done||this.lords[this.human].spouse)return null;
+    const candidates=Object.keys(this.lords).filter(l=>l!==this.human&&this.lords[l].alive&&this.lords[l].faction==='Saxon'&&this.friendly(this.human,l)&&this.territoryCount(l)===2);
+    candidates.sort((a,b)=>this.lords[a].treasury-this.lords[b].treasury||a.localeCompare(b));
+    return candidates[0]||null;
+  }
   remainingVassals(id){let p=this.provinces[id];return p.vassals_claimed?0:p.initial_vassals;}
   leadershipValue(l){return Math.max(.65,LEAD[l]+this.lords[l].leadership_bonus);}
   rank(l){return this.lords[l].leadership_tier;}
