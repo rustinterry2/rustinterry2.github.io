@@ -27,7 +27,14 @@ function rule(y){c.strokeStyle='#a46a38';c.lineWidth=2;c.beginPath();c.moveTo(11
 function button(key,label,rect,style='body',active=false){buttons.push({key,rect});let[x,y,x2,y2]=rect;c.fillStyle=active?'#c19562':'#d3ab73';c.fillRect(x,y,x2-x,y2-y);c.lineWidth=4;c.strokeStyle='#582c18';c.strokeRect(x+1,y+1,x2-x-2,y2-y-2);c.lineWidth=2;c.strokeStyle='#efcc99';c.strokeRect(x+7,y+7,x2-x-14,y2-y-14);text(label,(x+x2)/2,y+Math.max(1,(y2-y-fontMetrics[style].tile[1])/2),style,INK,'center');}
 function header(title,sub=null){text(title,426,1013,'title',INK,'center');if(sub)text(sub,426,1091,'small',LIGHT,'center');rule(1154);}
 function status(){let p=state.lords[state.human];return `${MONTH[state.month-1]} ${state.year}     Gold ${p.treasury}     Income ${state.income(state.human)}`;}
-function portraitPath(l){let key=SHORT[l]?.toLowerCase()||'robin';return img['portrait_'+key+'.png']||img['lady_catherine.png'];}
+function portraitPath(l){
+  // Story characters have dedicated artwork; never silently substitute Robin.
+  if(l==='Lady Catherine')return img['lady_catherine.png'];
+  if(l==='Robin Hood')return img['portrait_robin.png'];
+  const key=SHORT[l]?.toLowerCase();
+  if(!key||!img['portrait_'+key+'.png'])throw new Error('Portrait artwork not found for '+l);
+  return img['portrait_'+key+'.png'];
+}
 function drawPortrait(l,[x,y,x2,y2],caption=true){let im=portraitPath(l);c.fillStyle='#754928';c.fillRect(x,y,x2-x,y2-y);c.strokeStyle='#3c2012';c.lineWidth=5;c.strokeRect(x,y,x2-x,y2-y);c.fillStyle='#dfb880';c.fillRect(x+8,y+8,x2-x-16,y2-y-16);let w=x2-x-28,h=y2-y-28;
   // Fit and crop like the Pyto portrait renderer.
   let ratio=Math.max(w/im.width,h/im.height),sw=w/ratio,sh=h/ratio,sx=(im.width-sw)/2,sy=Math.max(0,Math.min(im.height-sh,(im.height-sh)*.24));c.drawImage(im,sx,sy,sw,sh,x+14,y+12,w,h);c.lineWidth=3;c.strokeStyle='#5b301b';c.strokeRect(x+12,y+10,w+4,h+4);if(caption)text(SHORT[l]||l,(x+x2)/2,y2+7,'small',INK,'center');}
