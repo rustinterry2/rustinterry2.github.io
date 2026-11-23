@@ -32,17 +32,16 @@ function drawPortrait(l,[x,y,x2,y2],caption=true){let im=portraitPath(l);c.fillS
   // Fit and crop like the Pyto portrait renderer.
   let ratio=Math.max(w/im.width,h/im.height),sw=w/ratio,sh=h/ratio,sx=(im.width-sw)/2,sy=Math.max(0,Math.min(im.height-sh,(im.height-sh)*.24));c.drawImage(im,sx,sy,sw,sh,x+14,y+12,w,h);c.lineWidth=3;c.strokeStyle='#5b301b';c.strokeRect(x+12,y+10,w+4,h+4);if(caption)text(SHORT[l]||l,(x+x2)/2,y2+7,'small',INK,'center');}
 function castleGraphic(id,x,y){c.fillStyle='#bb8a52';c.strokeStyle='#2a140e';c.lineWidth=3;c.fillRect(x-13,y-3,26,19);c.strokeRect(x-13,y-3,26,19);for(let dx of [-11,0,11]){c.fillStyle='#d7ab72';c.fillRect(x+dx-4,y-10,8,13);c.strokeRect(x+dx-4,y-10,8,13);}c.fillStyle='#4d2d1b';c.fillRect(x-3,y+8,6,8);}
+// Option B: 8-bit black silhouette at the ORIGINAL tiny on-map size (64 x 50).
+// 32x25 logical pixels, enlarged exactly 2x, without image smoothing.
+const HORSE_B = ["................................","....#..#........................","....#####.......................",".....#####......................","....#######.....................","...##.######....................","..##########....................",".####..######...................",".###...######...................",".......#######.....#####........",".......####################.....",".......#####################....",".......##################.###...",".......##################..##...","........################...##...","........################...##...","........#######....#####...##...",".......###.##.......#####...##..",".......##..##........#####...#..",".......#....#........#..##......","......##....#........#...#......","......##....#.......##...#......","......#....##.......#....##.....","....###...###......##...###.....",".....#.....##......#....##......"];
 function horse(x,y,rgb){
   c.save();c.translate(Math.round(x-32),Math.round(y-23));
-  c.fillStyle='#151210';
-  c.fillRect(18,18,42,19);c.fillRect(12,12,19,24);
-  c.fillRect(4,19,17,10);c.fillRect(11,7,7,12);
-  c.fillRect(19,31,7,19);c.fillRect(32,32,7,18);
-  c.fillRect(46,32,7,18);c.fillRect(54,30,7,17);
-  c.fillRect(57,21,9,6);
-  c.fillStyle='#352b25';c.fillRect(7,23,3,2);
-  c.fillStyle=color(rgb);c.fillRect(31,14,15,13);
-  c.fillStyle='#151210';c.fillRect(34,5,10,10);c.fillRect(29,25,21,3);
+  c.fillStyle='#14110f';
+  for(let py=0;py<HORSE_B.length;py++){
+    const row=HORSE_B[py];
+    for(let px=0;px<row.length;px++)if(row[px]==='#')c.fillRect(px*2,py*2,2,2);
+  }
   c.restore();
 }
 const cachedCanvas=document.createElement('canvas');cachedCanvas.width=W;cachedCanvas.height=H;let cachedCtx=cachedCanvas.getContext('2d');
@@ -153,7 +152,7 @@ function showEnding(){
 }
 function storyBegin(steps,ending='orders'){story=steps;storyEnd=ending;storyNext();}
 function storyNext(){if(!story.length){mode=storyEnd==='orders'?'orders':storyEnd;render();return;}let [kind,payload]=story.shift();if(kind==='text')alertText(payload,'__story__');else if(kind==='scene')sceneShow(payload,'__story__');else if(kind==='action'){if(payload==='union'){state.maidenUnion(pendingMaiden);pendingMaiden=null;}storyNext();}}
-function enterOrders(begin=false){mode='orders';selected=0;if(begin){let ally=Object.keys(state.lords).filter(l=>l!==state.human&&state.lords[l].alive&&state.lords[l].faction==='Saxon'&&state.friendly(state.human,l)&&state.territoryCount(l)===2);if(!state.maiden_rescue_done&&ally.length){pendingMaiden=ally[0];mode='maiden_offer';state.tournament_pending=false;}else if(state.tournament_pending&&!state.tournament_held){mode='tournament_offer';}}render();}
+function enterOrders(begin=false){mode='orders';selected=0;if(begin){const ally=state.maidenCandidate();if(ally){pendingMaiden=ally;mode='maiden_offer';state.tournament_pending=false;}else if(state.tournament_pending&&!state.tournament_held){mode='tournament_offer';}}render();}
 function startCampaign(){let seed=(Math.random()*4294967296)>>>0;mapInfo=options.map==='random'?randomMap(seed):null;state=new CrownState({seed,difficulty:options.difficulty,humanChoice:options.character,neighbors:mapInfo?.neighbors||ENGLAND});mode='orders';coloredMapKey='';visualOwners=null;visualHorsePos=null;visualAlive=null;guide='conquest';guideTarget=0;guideTicks=0;quantity={soldiers:0,knights:0,catapults:0};wantCastle=false;pendingTarget=null;pendingMaiden=null;queue=[];summary=[];reportScroll=0;enterOrders(true);}
 function costOf(){return U.reduce((n,u)=>n+quantity[u]*PRICES[u],0)+(wantCastle?20:0);}
 function clearQty(){quantity={soldiers:0,knights:0,catapults:0};wantCastle=false;}
@@ -166,7 +165,7 @@ function finishTurn(msg){
   else if(!pendingHumanFlash)setTimeout(nextAiStep,200);
 }
 function showFlash(id,onDone){flashId=id;flashVisible=false;let ticks=0;let interval=setInterval(()=>{flashVisible=!flashVisible;render();if(++ticks===4){clearInterval(interval);flashId=0;flashVisible=false;visualOwners=null;visualHorsePos=null;visualAlive=null;coloredMapKey='';render();onDone?.();}},115);}
-function nextAiStep(){if(mode!=='ai_phase'||aiRunning)return;if(pendingHumanFlash){let id=pendingHumanFlash;pendingHumanFlash=0;showFlash(id,()=>{if(state.outcome)showEnding();else setTimeout(nextAiStep,250);});return;}if(state.outcome){showEnding();return;}aiRunning=true;let loop=()=>{if(mode!=='ai_phase'){aiRunning=false;return;}if(queueIndex>=queue.length||state.outcome){let events='';if(!state.outcome){events=state.randomEvent();if(events)summary.push(events);let rec=state.advanceMonth();summary.push(`Taxes: +${rec[state.human]||0} gold to ${SHORT[state.human]}.`);let rivalry=state.possiblyRivalry();if(rivalry)summary.push(rivalry);state.checkEnd();if(!state.outcome&&!state.tournament_held&&!state.tournament_pending&&!state.maiden_rescue_done&&state.rng.random()<.10)state.tournament_pending=true;}mode='report';reportScroll=0;aiRunning=false;render();return;}
+function nextAiStep(){if(mode!=='ai_phase'||aiRunning)return;if(pendingHumanFlash){let id=pendingHumanFlash;pendingHumanFlash=0;showFlash(id,()=>{if(state.outcome)showEnding();else setTimeout(nextAiStep,250);});return;}if(state.outcome){showEnding();return;}aiRunning=true;let loop=()=>{if(mode!=='ai_phase'){aiRunning=false;return;}if(queueIndex>=queue.length||state.outcome){let events='';if(!state.outcome){events=state.randomEvent();if(events)summary.push(events);let rec=state.advanceMonth();summary.push(`Taxes: +${rec[state.human]||0} gold to ${SHORT[state.human]}.`);let rivalry=state.possiblyRivalry();if(rivalry)summary.push(rivalry);state.checkEnd();if(!state.outcome&&!state.tournament_held&&!state.tournament_pending&&!state.maidenCandidate()&&state.rng.random()<.10)state.tournament_pending=true;}mode='report';reportScroll=0;aiRunning=false;render();return;}
     let l=queue[queueIndex++],home=state.lords[state.human].home_province,beforeOwner=state.provinces[home].owner;let owners=Object.fromEntries(IDS.map(id=>[id,state.provinces[id].owner]));let oldHorse=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.campaign_province]));let oldAlive=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.alive]));let msg=state.aiOne(l),target=state.last_battle_target;summary.push(msg||`${SHORT[l]}: No action.`);aiMessage=msg;let changed=IDS.find(id=>owners[id]!==state.provinces[id].owner&&state.provinces[id].owner===l);if(!target&&changed)target=changed;
     if(target&&owners[target]){visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;if(target===home&&beforeOwner===state.human){let won=state.provinces[home].owner===state.human;pendingHomeAttack={attacker:l,target,won};aiRunning=false;sceneShow('home_castle_under_attack.png','__home_attack_intro__');return;}}
     render();if(target&&owners[target])showFlash(target,()=>setTimeout(loop,300));else setTimeout(loop,300);
