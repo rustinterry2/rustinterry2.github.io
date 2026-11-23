@@ -138,44 +138,77 @@ function drawInvitation(maiden){header(maiden?'A Saxon Lady in Peril':'A Tournam
 function drawAi(){header('The Lords Take Their Turns',status());lines([aiMessage||'The other lords prepare their orders.'],1260,70,'small');}
 function drawGuide(){if(guide==='off'||!['orders','conquest','transfer','move'].includes(mode))return;let target={conquest:'conquest',transfer:'transfer',plus:'plus:soldiers',move:'move'}[guide],btn=buttons.find(b=>b.key===target);let x,y;if(guide==='province'){let pt=mapInfo?.type==='random'?mapInfo.horses[guideTarget]:HORSES[guideTarget];if(!pt)return;[x,y]=pt;y-=37;}else if(btn){x=(btn.rect[0]+btn.rect[2])/2;y=btn.rect[1]-23;}else return;c.fillStyle='#ffd34f';c.strokeStyle='#5e3513';c.lineWidth=4;let dy=Math.sin(guideTicks/3)*8;c.beginPath();c.moveTo(x-18,y-35+dy);c.lineTo(x+18,y-35+dy);c.lineTo(x+18,y-10+dy);c.lineTo(x+29,y-10+dy);c.lineTo(x,y+17+dy);c.lineTo(x-29,y-10+dy);c.lineTo(x-18,y-10+dy);c.closePath();c.fill();c.stroke();}
 function render(){if(!fontMetrics)return;buttons.length=0;c.clearRect(0,0,W,H);if(mode==='splash'){fullScreen('title_splash.png');return;}if(mode==='scene'){fullScreen(scene,sceneOverlay);return;}if(mode==='setup'){renderSetup();return;}renderMap();switch(mode){case 'orders':drawOrders();break;case 'read':drawRead();break;case 'conquest':drawConquest();break;case 'army':drawArmy();break;case 'castle_pick':drawCastlePick();break;case 'transfer':drawTransfer();break;case 'move':drawMove();break;case 'battle':drawBattle();break;case 'passage':drawPassage();break;case 'report':drawReport();break;case 'history':drawHistory();break;case 'accounts':drawAccounts();break;case 'notice':drawNotice();break;case 'tournament_offer':drawInvitation(false);break;case 'maiden_offer':drawInvitation(true);break;case 'ai_phase':drawAi();break;}drawGuide();}
-function save(){if(!state||!['orders','report'].includes(mode))return;try{localStorage.setItem(savedKey,JSON.stringify({state:state.toJSON(),options,map:mapInfo?.type==='random'?'random':'england',mode:mode==='ai_phase'?'report':mode,summary}));document.getElementById('resume').hidden=false;}catch(e){console.warn('Unable to save:',e);}}
-function alertText(s,back=mode){message=s;backMode=back;mode='notice';render();}
+function alertText(s,back=mode,face=null){message=s;backMode=back;noticePortrait=face;mode='notice';render();}
 function sceneShow(file,returnMode=mode,notice='',noticeBack=returnMode,overlay=''){scene=file;sceneReturn=returnMode;sceneNotice=notice;sceneNoticeBack=noticeBack;sceneOverlay=overlay;mode='scene';render();}
+function showEnding(){
+  if(state.outcome==='victory'){
+    storyBegin([
+      ['text','The Norman lords have fallen. Thy banners fly above their castles, and the crown of England is thine.'],
+      ['scene','the_end.png'],
+      ['text','Thy conquest is complete. A new reign begins.']
+    ],'setup');
+  }else if(state.outcome==='defeat'){
+    sceneShow('home_castle_fallen.png','__new_campaign__','','','The End');
+  }
+}
 function storyBegin(steps,ending='orders'){story=steps;storyEnd=ending;storyNext();}
 function storyNext(){if(!story.length){mode=storyEnd==='orders'?'orders':storyEnd;render();return;}let [kind,payload]=story.shift();if(kind==='text')alertText(payload,'__story__');else if(kind==='scene')sceneShow(payload,'__story__');else if(kind==='action'){if(payload==='union'){state.maidenUnion(pendingMaiden);pendingMaiden=null;}storyNext();}}
-function enterOrders(begin=false){mode='orders';selected=0;if(begin){let ally=Object.keys(state.lords).filter(l=>l!==state.human&&state.lords[l].alive&&state.lords[l].faction==='Saxon'&&state.friendly(state.human,l)&&state.territoryCount(l)===2);if(!state.maiden_rescue_done&&ally.length){pendingMaiden=ally[0];mode='maiden_offer';state.tournament_pending=false;}else if(state.tournament_pending&&!state.tournament_held){mode='tournament_offer';}}render();save();}
+function enterOrders(begin=false){mode='orders';selected=0;if(begin){let ally=Object.keys(state.lords).filter(l=>l!==state.human&&state.lords[l].alive&&state.lords[l].faction==='Saxon'&&state.friendly(state.human,l)&&state.territoryCount(l)===2);if(!state.maiden_rescue_done&&ally.length){pendingMaiden=ally[0];mode='maiden_offer';state.tournament_pending=false;}else if(state.tournament_pending&&!state.tournament_held){mode='tournament_offer';}}render();}
 function startCampaign(){let seed=(Math.random()*4294967296)>>>0;mapInfo=options.map==='random'?randomMap(seed):null;state=new CrownState({seed,difficulty:options.difficulty,humanChoice:options.character,neighbors:mapInfo?.neighbors||ENGLAND});mode='orders';coloredMapKey='';visualOwners=null;visualHorsePos=null;visualAlive=null;guide='conquest';guideTarget=0;guideTicks=0;quantity={soldiers:0,knights:0,catapults:0};wantCastle=false;pendingTarget=null;pendingMaiden=null;queue=[];summary=[];reportScroll=0;enterOrders(true);}
 function costOf(){return U.reduce((n,u)=>n+quantity[u]*PRICES[u],0)+(wantCastle?20:0);}
 function clearQty(){quantity={soldiers:0,knights:0,catapults:0};wantCastle=false;}
-function finishTurn(msg){summary=[`${SHORT[state.human]}: ${msg}`];queue=Object.keys(state.lords).filter(l=>l!==state.human&&state.lords[l].alive);state.rng.shuffle(queue);queueIndex=0;aiMessage='The other lords prepare their orders.';mode='ai_phase';render();save();setTimeout(nextAiStep,350);}
+function finishTurn(msg){
+  summary=[SHORT[state.human]+': '+msg];
+  queue=Object.keys(state.lords).filter(l=>l!==state.human&&state.lords[l].alive);
+  state.rng.shuffle(queue);queueIndex=0;
+  aiMessage='The other lords prepare their orders.';mode='ai_phase';render();
+  if(!state.outcome)setTimeout(nextAiStep,350);
+  else if(!pendingHumanFlash)setTimeout(nextAiStep,200);
+}
 function showFlash(id,onDone){flashId=id;flashVisible=false;let ticks=0;let interval=setInterval(()=>{flashVisible=!flashVisible;render();if(++ticks===4){clearInterval(interval);flashId=0;flashVisible=false;visualOwners=null;visualHorsePos=null;visualAlive=null;coloredMapKey='';render();onDone?.();}},115);}
-function nextAiStep(){if(mode!=='ai_phase'||aiRunning)return;if(pendingHumanFlash){let id=pendingHumanFlash;pendingHumanFlash=0;showFlash(id,()=>setTimeout(nextAiStep,250));return;}aiRunning=true;let loop=()=>{if(mode!=='ai_phase'){aiRunning=false;return;}if(queueIndex>=queue.length||state.outcome){let events='';if(!state.outcome){events=state.randomEvent();if(events)summary.push(events);let rec=state.advanceMonth();summary.push(`Taxes: +${rec[state.human]||0} gold to ${SHORT[state.human]}.`);let rivalry=state.possiblyRivalry();if(rivalry)summary.push(rivalry);state.checkEnd();if(!state.outcome&&!state.tournament_held&&!state.tournament_pending&&!state.maiden_rescue_done&&state.rng.random()<.10)state.tournament_pending=true;}mode='report';reportScroll=0;aiRunning=false;render();save();return;}
+function nextAiStep(){if(mode!=='ai_phase'||aiRunning)return;if(pendingHumanFlash){let id=pendingHumanFlash;pendingHumanFlash=0;showFlash(id,()=>{if(state.outcome)showEnding();else setTimeout(nextAiStep,250);});return;}if(state.outcome){showEnding();return;}aiRunning=true;let loop=()=>{if(mode!=='ai_phase'){aiRunning=false;return;}if(queueIndex>=queue.length||state.outcome){let events='';if(!state.outcome){events=state.randomEvent();if(events)summary.push(events);let rec=state.advanceMonth();summary.push(`Taxes: +${rec[state.human]||0} gold to ${SHORT[state.human]}.`);let rivalry=state.possiblyRivalry();if(rivalry)summary.push(rivalry);state.checkEnd();if(!state.outcome&&!state.tournament_held&&!state.tournament_pending&&!state.maiden_rescue_done&&state.rng.random()<.10)state.tournament_pending=true;}mode='report';reportScroll=0;aiRunning=false;render();return;}
     let l=queue[queueIndex++],home=state.lords[state.human].home_province,beforeOwner=state.provinces[home].owner;let owners=Object.fromEntries(IDS.map(id=>[id,state.provinces[id].owner]));let oldHorse=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.campaign_province]));let oldAlive=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.alive]));let msg=state.aiOne(l),target=state.last_battle_target;summary.push(msg||`${SHORT[l]}: No action.`);aiMessage=msg;let changed=IDS.find(id=>owners[id]!==state.provinces[id].owner&&state.provinces[id].owner===l);if(!target&&changed)target=changed;
-    if(target&&owners[target]){visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;if(target===home&&beforeOwner===state.human){let won=state.provinces[home].owner===state.human;pendingHomeAttack={attacker:l,target,won};aiRunning=false;sceneShow('home_castle_under_attack.png','__home_attack_intro__');save();return;}}
+    if(target&&owners[target]){visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;if(target===home&&beforeOwner===state.human){let won=state.provinces[home].owner===state.human;pendingHomeAttack={attacker:l,target,won};aiRunning=false;sceneShow('home_castle_under_attack.png','__home_attack_intro__');return;}}
     render();if(target&&owners[target])showFlash(target,()=>setTimeout(loop,300));else setTimeout(loop,300);
   };loop();}
 function resumeAi(){mode='ai_phase';render();setTimeout(nextAiStep,260);}
 function afterHomeIntro(){let e=pendingHomeAttack;alertText(`${SHORT[e.attacker]} has reached ${T[e.target][0]}. Thy home castle is under attack! Man the walls and beat back the invader.`,'__home_flash__');}
 function afterHomeFlash(){mode='ai_phase';render();showFlash(pendingHomeAttack.target,()=>{if(pendingHomeAttack.won)alertText('Thy men have held the castle. The invader is thrown back from thy gates.','__home_resume__');else alertText('Thy home castle has fallen. With its loss, thy cause in England is ended.','__home_defeat__');});}
-function provinceAt(x,y){if(y<120||y>950||x<15||x>838)return 0;if(mapInfo?.type==='random'){let lx=Math.floor(x/4),ly=Math.floor(y/4);return mapInfo.cells[ly*mapInfo.w+lx]||0;}let id=hitData.data[(Math.floor(y)*W+Math.floor(x))*4];return T[id]?id:0;}
+function provinceAt(x,y){if(y<120||y>950||x<15||x>838)return 0;if(mapInfo?.type==='random'){let lx=Math.floor(x/4),ly=Math.floor(y/4);return mapInfo.cells[ly*mapInfo.w+lx]||0;}let id=hitData.data[(Math.floor(y)*W+Math.floor(x))*4];if(id===11)id=14;return T[id]?id:0;}
+function isSherwood(x,y){
+  if(mapInfo?.type==='random'||x<425||x>=526||y<295||y>=366)return false;
+  const i=(Math.floor(y)*W+Math.floor(x))*4,r=baseData.data[i],g=baseData.data[i+1],b=baseData.data[i+2];
+  return g>r*1.14&&g>b*1.05&&g>55&&r<125;
+}
 function guideTap(key){if(guide==='off')return;let expected={conquest:'conquest',transfer:'transfer',plus:'plus:soldiers',move:'move'}[guide];if(expected!==key){if(!(guide==='move'&&key==='plus:soldiers'))guide='off';return;}guide=({conquest:'transfer',transfer:'plus',plus:'move',move:'province'})[guide];if(guide==='province'){let p=state.lords[state.human];guideTarget=(state.neighbors[p.campaign_province]||[]).filter(id=>!state.provinces[id].owner).sort((a,b)=>T[b][2]-T[a][2])[0]||0;}}
-function handleClick(x,y){if(mode==='splash'){mode='setup';render();return;}if(mode==='scene'){let back=sceneReturn;if(sceneNotice){let n=sceneNotice,b=sceneNoticeBack;sceneNotice='';alertText(n,b);return;}if(back==='__story__')storyNext();else if(back==='__new_campaign__'){mode='setup';render();}else if(back==='__home_attack_intro__')afterHomeIntro();else if(back==='__resume_ai__')resumeAi();else{mode=back;render();}return;}if(mode==='ai_phase')return;
+function handleClick(x,y){if(mode==='splash'){mode='setup';render();return;}if(mode==='scene'){let back=sceneReturn;if(sceneNotice){let n=sceneNotice,b=sceneNoticeBack;sceneNotice='';alertText(n,b,/Robin pledges/.test(n)?'Robin Hood':null);return;}if(back==='__story__')storyNext();else if(back==='__new_campaign__'){mode='setup';render();}else if(back==='__home_attack_intro__')afterHomeIntro();else if(back==='__resume_ai__')resumeAi();else{mode=back;render();}return;}if(mode==='ai_phase')return;
   let key=buttons.slice().reverse().find(b=>x>=b.rect[0]&&y>=b.rect[1]&&x<=b.rect[2]&&y<=b.rect[3])?.key;
-  if(key){try{action(key);}catch(e){console.error(e);alertText(e.message);}render();if(!['ai_phase'].includes(mode))save();return;}
+  if(key){try{action(key);}catch(e){console.error(e);alertText(e.message);}render();if(!['ai_phase'].includes(mode))return;}
+  if(isSherwood(x,y)){
+    const returnTo=mode;
+    if(mode==='read')selected=-1;
+    if(mode==='move'){
+      try{
+        state.useRobin();
+        sceneShow('robin_sherwood.png',returnTo,'Robin pledges aid to thy next enemy battle.',returnTo);
+      }catch(e){alertText(e.message,returnTo);}
+    }else sceneShow('robin_sherwood.png',returnTo);
+    return;
+  }
   let id=provinceAt(x,y);if(!id)return;
   if(mode==='read'){selected=id;render();return;}
   if(mode==='castle_pick'){selected=id;selectedCastle=id;render();return;}
   if(mode==='move'){
     let [ok,why]=state.legalMove(state.human,id);if(!ok){alertText(why,'move');return;}guide=guide==='province'&&guideTarget===id?'off':guide;
-    pendingTarget=id;selected=id;let owner=state.provinces[id].owner;if(owner===state.human){state.move(state.human,id);render();save();return;}
-    if(!owner){let owners=Object.fromEntries(IDS.map(n=>[n,state.provinces[n].owner]));let oldHorse=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.campaign_province]));let oldAlive=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.alive]));let res=state.move(state.human,id);visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;pendingHumanFlash=id;finishTurn(res.text);return;}
+    pendingTarget=id;selected=id;let owner=state.provinces[id].owner;if(owner===state.human){state.move(state.human,id);render();return;}
+    if(!owner||(!state.friendly(state.human,owner)&&COUNT(state.defenders(id))===0)){let owners=Object.fromEntries(IDS.map(n=>[n,state.provinces[n].owner]));let oldHorse=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.campaign_province]));let oldAlive=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.alive]));let res=state.move(state.human,id);visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;pendingHumanFlash=id;finishTurn(res.text);return;}
     if(state.friendly(state.human,owner)){mode='passage';render();return;}mode='battle';tactic='Stand and Fight';render();
   }
 }
 function action(k){if(mode==='setup'){if(k.startsWith('setup_lord:'))options.character=k.endsWith(':random')?null:k.split(':').slice(1).join(':');else if(k.startsWith('setup_difficulty:'))options.difficulty=k.split(':')[1];else if(k.startsWith('setup_map:'))options.map=k.split(':')[1];else if(k==='setup_begin')startCampaign();return;}
   if(k==='notice_ok'){let back=backMode;if(back==='__story__')storyNext();else if(back==='__home_flash__')afterHomeFlash();else if(back==='__home_resume__'){pendingHomeAttack=null;resumeAi();}else if(back==='__home_defeat__'){pendingHomeAttack=null;sceneShow('home_castle_fallen.png','__new_campaign__','','','The End');}else{mode=back;}return;}
   if(k==='report_up'){reportScroll=Math.max(0,reportScroll-3);return;}if(k==='report_down'){reportScroll+=3;return;}
-  if(k==='report_ok'){if(state.outcome)sceneShow(state.outcome==='victory'?'the_end.png':'home_castle_fallen.png','__new_campaign__','','',state.outcome==='defeat'?'The End':'');else enterOrders(true);return;}
+  if(k==='report_ok'){if(state.outcome)showEnding();else enterOrders(true);return;}
   if(k==='tournament_yes'){state.tournament_pending=false;state.tournament_held=true;state.changeLeadership(state.human,.04);let r=state.changeRank(state.human,1);storyBegin([['scene','tournament_trumpets.png'],['text','Heralds sound their trumpets, and the lords gather before the lists.'],['scene','tournament_joust.png'],['text',`Before the assembled court, thou hast ridden with courage and won new renown. Thy leadership is now ${r}.`]]);return;}
   if(k==='tournament_no'){state.tournament_pending=false;state.tournament_held=true;state.changeLeadership(state.human,-.04);let r=state.changeRank(state.human,-1);alertText(`Thou hast declined the tournament. Thy leadership is now ${r}.`,'orders');return;}
   if(k==='maiden_yes'){let r=state.changeRank(state.human,1),ally=pendingMaiden;storyBegin([['text','By night thou dost approach the Norman stronghold. Steel must decide whether Lady Catherine shall be freed.'],['scene','maiden_swordfight.png'],['text','The Norman guards are overcome, and Lady Catherine is safely freed from the keep.'],['scene','lady_catherine.png'],['action','union'],['text',`Lady Catherine thanks thee for her rescue. The lands of ${SHORT[ally]} now stand with thine. Thy leadership is now ${r}.`]]);return;}
@@ -192,7 +225,7 @@ function action(k){if(mode==='setup'){if(k.startsWith('setup_lord:'))options.cha
   if(k==='robin'){state.useRobin();sceneShow('robin_sherwood.png','conquest','Robin pledges aid to thy next enemy battle.','conquest');return;}
   if(k.startsWith('tactic:')){tactic=k.split(':').slice(1).join(':');return;}
   if(k==='pass_safe'){state.move(state.human,pendingTarget,'Stand and Fight',true);mode='move';selected=pendingTarget;pendingTarget=null;return;}
-  if(k==='pass_attack'){attackingAlly=true;mode='battle';tactic='Stand and Fight';return;}
+  if(k==='pass_attack'){attackingAlly=true;if(COUNT(state.defenders(pendingTarget))===0){const id=pendingTarget,owners=Object.fromEntries(IDS.map(n=>[n,state.provinces[n].owner])),oldHorse=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.campaign_province])),oldAlive=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.alive]));const r=state.move(state.human,id,'Stand and Fight',false);visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;pendingHumanFlash=id;attackingAlly=false;pendingTarget=null;finishTurn(r.text);return;}mode='battle';tactic='Stand and Fight';return;}
   if(k==='fight'){let id=pendingTarget,isCastle=state.provinces[id].home_castle||state.provinces[id].secondary_castle,fac=state.lords[state.provinces[id].owner]?.faction;let owners=Object.fromEntries(IDS.map(n=>[n,state.provinces[n].owner]));let oldHorse=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.campaign_province]));let oldAlive=Object.fromEntries(Object.entries(state.lords).map(([n,p])=>[n,p.alive]));let r=state.move(state.human,id,tactic,!attackingAlly);visualOwners=owners;visualHorsePos=oldHorse;visualAlive=oldAlive;pendingHumanFlash=id;attackingAlly=false;pendingTarget=null;finishTurn(r.text);if(isCastle)sceneShow(fac==='Norman'?'norman_castle.png':'saxon_castle.png','__resume_ai__');return;}
 }
 function completePurchase(){if(costOf()>state.lords[state.human].treasury)throw Error('Not enough gold');if(wantCastle){let id=selectedCastle,pr=state.provinces[id];if(!id||pr.owner!==state.human||pr.home_castle||pr.secondary_castle)throw Error('Choose an owned province without a castle');}let cost=costOf();if(COUNT(quantity))state.purchase(state.human,quantity);if(wantCastle)state.purchaseCastle(state.human,selectedCastle,true);clearQty();finishTurn(`Army purchased for ${cost} gold.`);}
@@ -206,9 +239,6 @@ function randomMap(seed){let rng=new Rng(seed),w=213,h=232,cells=new Uint8Array(
   let adj=Object.fromEntries(IDS.map(id=>[id,new Set()]));for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){let id=cells[y*w+x];if(!id)continue;for(let n of [cells[y*w+x+1],cells[(y+1)*w+x]])if(n&&n!==id){adj[id].add(n);adj[n].add(id);}}
   let neighbors=Object.fromEntries(IDS.map(id=>[id,[...adj[id]].sort((a,b)=>a-b)]));let anchors=Object.fromEntries(IDS.map(id=>[id,byId[id].map(v=>v*4)]));return{type:'random',seed,w,h,cells:[...cells],neighbors,horses:anchors,castles:anchors};
 }
-function restore(){try{let item=JSON.parse(localStorage.getItem(savedKey));if(!item)return false;state=CrownState.fromJSON(item.state);options=item.options;mapInfo=item.map==='random'?randomMap(state.seed):null;mode=['splash','ai_phase','scene'].includes(item.mode)?'orders':item.mode;summary=item.summary||[];coloredMapKey='';render();return true;}catch(e){console.warn('Save could not be restored',e);return false;}}
 gameCanvas.addEventListener('pointerup',ev=>{if(tapActive)return;tapActive=true;setTimeout(()=>tapActive=false,100);let r=gameCanvas.getBoundingClientRect(),x=(ev.clientX-r.left)*W/r.width,y=(ev.clientY-r.top)*H/r.height;handleClick(x,y);});
-document.getElementById('new-game').addEventListener('click',()=>{mode='setup';render();});
-document.getElementById('resume').addEventListener('click',()=>{restore();});
 setInterval(()=>{if(mode==='orders'&&guide!=='off'){guideTicks++;render();}},460);
-loadAssets().then(()=>{render();if(localStorage.getItem(savedKey))document.getElementById('resume').hidden=false;}).catch(err=>{console.error(err);document.getElementById('status').textContent=err.message;alert('Unable to load Crown assets: '+err.message);});
+loadAssets().then(()=>{render();}).catch(err=>{console.error(err);document.getElementById('status').textContent=err.message;alert('Unable to load Crown assets: '+err.message);});
