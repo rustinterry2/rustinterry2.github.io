@@ -12,12 +12,12 @@ Open http://localhost:8000 in a modern browser. You must use HTTP rather than `f
 
 ## Controls
 
-Tap anywhere on the opening splash to select a character, difficulty, and kingdom. Tap map provinces to inspect, move into, or attack them depending on the current Orders screen. Use Seek Conquest → Transfer Troops to raise a field army before marching. Home castles require at least one catapult to attack. The AI automatically plays after each paid or hostile human action. The current campaign is periodically saved in localStorage; use Resume Saved Game to continue.
+Tap anywhere on the opening splash to select a character, difficulty, and kingdom. Tap map provinces to inspect, move into, or attack them depending on the current Orders screen. Use Seek Conquest → Transfer Troops to raise a field army before marching. Home castles require at least one catapult to attack. The AI automatically plays after each paid or hostile human action. There is no save/resume feature: each session is one continuous campaign, matching the Pyto game.
 
 ## Architecture
 
 - `engine.js`: game-state model, troop accounting, battle probabilities, casualties, diplomacy, balanced Norman AI
-- `app.js`: canvas rendering, touch controls, invitations, scene transitions, random-map generation and local saving
+- `app.js`: canvas rendering, touch controls, invitations, scene transitions, random-map generation, Robin Hood visits, and victory scenes
 - `assets/`: original Pyto artwork and font atlas, reproduced with permission review pending
 - `tests/`: Node's built-in test runner
 
@@ -30,3 +30,11 @@ The engine passed automated tests over thousands of simulated AI turns, three di
 ## Copyright
 
 The strategy systems have been implemented for this project. The image collection includes assets related to Cinemaware's *Defender of the Crown* and should undergo a rights/permission review before public release. Code and artwork should not be assumed to share licensing.
+
+## Pages hosting and repository migration
+
+Current deployed URL: https://rustinterry2.github.io/crown/
+
+This directory currently lives under the homepage repository. To split it into a standalone repo named `crown`, create that public repository, copy all files inside this `crown/` folder to the new repository root (including assets and tests), then enable GitHub Pages from the `main` branch root. GitHub project Pages will retain the URL `https://rustinterry2.github.io/crown/`. Update the homepage link if you choose a different repository name. Leave the homepage copy in place until deployment is confirmed, then remove it.
+
+Changes: no browser saves or footer controls; black connected horses; territory outline selection; colored lord markers in logs; Sherwood click access; Robin portrait; unopposed capture; direct victory ending.
